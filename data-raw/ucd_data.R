@@ -47,7 +47,7 @@ data_all <- merge(
   )
 
 # clean data #
-data_cleaned <- metformin::clean_data_ucd(data_all)
+data_cleaned <- metformin.rct::clean_data_ucd(data_all)
 
 # update 'tassone_cat' (methylation group)
 new_methylation_cat <- openxlsx::read.xlsx(

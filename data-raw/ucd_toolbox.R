@@ -3,15 +3,15 @@ devtools::load_all()
 #### import data ####
 redcap_raw <- read.csv(
   file = paste0(
-    "./data-ext/Toolbox/CTSC4328ADoubleBlind-",
+    "./inst/extdata/Toolbox/CTSC4328ADoubleBlind-",
     "METUCDToolboxQC_DATA_2024-10-31_1621.csv"
   )
 )
 
-tlbx_raw <- read.csv("./data-ext/Toolbox/UCD_MET_November6.csv")
+tlbx_raw <- read.csv("./inst/extdata/Toolbox/UCD_MET_November6.csv")
 
 new_admin <- openxlsx::read.xlsx(
-  "./data-ext/Toolbox/Toolbox_admin_UCD_MTL Site Completed.xlsx"
+  "./inst/extdata/Toolbox/Toolbox_admin_UCD_MTL Site Completed.xlsx"
 )
 
 # incorporate new admin data
