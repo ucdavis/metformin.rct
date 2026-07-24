@@ -1,0 +1,116 @@
+{{< include _biomarker_data.qmd >}}
+
+```{r}
+#| label: biomarkers-ancova-interaction
+#| include: false
+
+# add age_group to biomarker_data for age-stratified interaction
+biomarker_data <- biomarker_data |>
+  dplyr::mutate(
+    age_group = dplyr::case_when(
+      demo_age < 12 ~ "Age 6-11",
+      demo_age >= 12 ~ "Age 12+"
+    ) |>
+      factor(levels = c("Age 6-11", "Age 12+"))
+  )
+
+biomarker_var <- c(
+  "tassone_fmr1_log", "tassone_cyfip1_log", "tassone_mmp9_log", "fmrp_rhmc_log"
+)
+biomarker_label <- c(
+  "log(FMR1)", "log(CYFIP1)", "log(MMP9)", "log[FMRP (relative)]"
+)
+names(biomarker_label) <- biomarker_var
+
+# fit ANCOVA models with Treatment*strata_var interaction
+biomarker_ancova_intrxn <- lapply(
+  biomarker_var,
+  function(x) fit_ancova_interaction(
+    dataset = biomarker_data,
+    outcome = x,
+    outcome_label = biomarker_label[x],
+    demo_vars = c("demo_age_center", "leit3_nv_iq_center"),
+    covariates = NULL,
+    strata_var = strata_var,
+    strata_label = strata_label,
+    site = FALSE
+  )
+)
+names(biomarker_ancova_intrxn) <- biomarker_label
+
+# extract tables from fit_ancova_interaction output
+biomarker_ancova_intrxn_summary <- dplyr::bind_rows(
+  lapply(
+    names(biomarker_ancova_intrxn),
+    function(x) {
+      biomarker_ancova_intrxn[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-biomarkers-ancova-interaction
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Biomarkers - ANCOVA results with Treatment*{strata_label} interaction showing LS means (95% CI)
+#|    for baseline and 16-week change, and between-group difference in changes stratified by {strata_label}.
+#|    {data_caption}")
+
+biomarker_ancova_intrxn_ft <- biomarker_ancova_intrxn_summary |>
+  dplyr::select(-interaction_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    strata_label = strata_label,
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI",
+    interaction_est = "Interaction Estimate",
+    interaction_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "", "Placebo", "Metformin", "Between-Group Differences", ""),
+    colwidths = c(1, 1, 7, 7, 4, 2)
+  ) |>
+  flextable::merge_v(j = c("Outcome", "interaction_est", "interaction_ci")) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1:2, align = "left", part = "all") |>
+  flextable::align(j = c(21, 22), align = "center", part = "body") |>
+  flextable::vline(j = c(2, 9, 16), part = "all") |>
+  flextable::autofit()
+
+biomarker_ancova_intrxn_ft
+```
+
+```{r}
+#| label: fig-biomarkers-ancova-interaction-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "Biomarkers - Forest plot showing Treatment*{strata_label} interaction term. {data_caption}")
+
+plot_ancova_interaction_forest(
+  obj = biomarker_ancova_intrxn,
+  labels = biomarker_label,
+  min_mult = 1.1,
+  max_mult = 1.1,
+  arrow_labs = strata_levels
+)
+```

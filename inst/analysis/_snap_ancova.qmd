@@ -1,0 +1,94 @@
+```{r}
+#| label: snap-ancova
+#| include: false
+
+snap_var <- c("snap_adhd_combtot", "snap_odd_tot")
+snap_label <- c("ADHD Combined Total", "ODD Total")
+
+names(snap_label) = snap_var
+
+# fit ANCOVA models
+snap_ancova <- lapply(
+  snap_var,
+  function(x) fit_ancova(
+    dataset = data,
+    outcome = x,
+    outcome_label = snap_label[x],
+    covariates = NULL
+  )
+)
+names(snap_ancova) <- snap_label
+
+# extract tables from fit_ancova output
+snap_ancova_summary <- dplyr::bind_rows(
+  lapply(
+    names(snap_ancova),
+    function(x) {
+      snap_ancova[[x]]$tbl
+    }
+  )
+)
+
+# Note: Plots will be added in a future iteration
+```
+
+```{r}
+#| label: tbl-snap-ancova
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "SNAP-IV - ANCOVA results showing LS means (95% CI) for baseline and 16-week change,
+#|    and between-group difference in changes. {data_caption}")
+
+snap_ancova_ft <- snap_ancova_summary |>
+  dplyr::select(-contrast_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 7, 7, 4)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 8, 15), part = "all") |>
+  flextable::autofit()
+
+snap_ancova_ft
+```
+
+```{r}
+#| label: fig-snap-ancova-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "SNAP-IV - Forest plot showing between-group differences in changes. {data_caption}")
+
+snap_ancova_list <- lapply(snap_ancova, function(x) list("fit" = x$fit$fit))
+
+plot_ancova_forest(
+  obj = snap_ancova_list,
+  labels = snap_label,
+  min_mult = 1.1,
+  max_mult = 1.1
+)
+```

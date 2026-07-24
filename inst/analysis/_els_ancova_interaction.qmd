@@ -1,0 +1,103 @@
+```{r}
+#| label: els-ancova-interaction
+#| include: false
+
+els_var <- c("nar_ndw50_a", "con_ndw50_a")
+els_label <- c(
+  "Narrative NDW50",
+  "Conversation NDW50"
+)
+els_covariates <- c("nar_totnumut_a", "con_totnumut_a")
+names(els_label) = els_var
+names(els_covariates) = els_var
+
+# fit ANCOVA models with Treatment*Age Group interaction
+els_ancova_intrxn <- lapply(
+  els_var,
+  function(x) fit_ancova_interaction(
+    dataset = data,
+    outcome = x,
+    outcome_label = els_label[x],
+    covariates = els_covariates[x] |> unname(),
+    strata_var = strata_var,
+    strata_label = strata_label
+  )
+)
+names(els_ancova_intrxn) <- els_label
+
+# extract tables from fit_ancova_interaction output
+els_ancova_intrxn_summary <- dplyr::bind_rows(
+  lapply(
+    names(els_ancova_intrxn),
+    function(x) {
+      els_ancova_intrxn[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-els-ancova-interaction
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "ELS - ANCOVA results with Treatment*{strata_label} interaction showing LS means (95% CI)
+#|    for baseline and 16-week change, and between-group difference in changes stratified by age group.
+#|    {data_caption}")
+
+els_ancova_intrxn_ft <- els_ancova_intrxn_summary |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    strata_label = strata_label,
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI",
+    interaction_est = "Interaction Estimate",
+    interaction_ci = "95% CI",
+    interaction_p = "Interaction p"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "", "Placebo", "Metformin", "Between-Group Differences", ""),
+    colwidths = c(1, 1, 7, 7, 4, 3)
+  ) |>
+  flextable::merge_v(j = c("Outcome", "interaction_est", "interaction_ci", "interaction_p")) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1:2, align = "left", part = "all") |>
+  flextable::align(j = c(21, 22, 23), align = "center", part = "body") |>
+  flextable::vline(j = c(2, 9, 16), part = "all") |>
+  flextable::autofit()
+
+els_ancova_intrxn_ft
+```
+
+```{r}
+#| label: fig-els-ancova-interaction-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "ELS - Forest plot showing Treatment*{strata_label} interaction term. {data_caption_els}")
+
+plot_ancova_interaction_forest(
+  obj = els_ancova_intrxn,
+  labels = els_label,
+  min_mult = 1.1,
+  max_mult = 1.1,
+  arrow_labs = strata_levels
+)
+```

@@ -1,0 +1,105 @@
+```{r}
+#| label: toolbox-ancova-unadjusted
+#| include: false
+
+tlbx_ancova_data <- metformin.rct::met_tlbx_clean |>
+  dplyr::mutate(
+    dplyr::across(
+      .cols = dplyr::ends_with("_analytic"),
+      ~ dplyr::if_else(.x < 0, NA_real_, .x)
+    )
+  )
+
+tlbx_var <- c(
+  "tcb_read_analytic", "tcb_vocb_analytic", "tcb_ptrncomp_analytic",
+  "tcb_dccs_analytic", "tcb_flnkr_analytic", "tcb_picseq_analytic",
+  "tcb_lstsrt_analytic", "tcb_crystl_analytic"
+)
+tlbx_label <- c(
+  "Oral Reading", "Picture Vocabulary", "Pattern Comparison",
+  "DCCS", "Flanker", "Picture Sequence", "List Sort", "Crystal Composite"
+)
+names(tlbx_label) <- tlbx_var
+
+# fit ANCOVA models (unadjusted for demographics)
+tlbx_ancova_unadj <- lapply(
+  tlbx_var,
+  function(x) fit_ancova(
+    dataset = tlbx_ancova_data,
+    outcome = x,
+    outcome_label = tlbx_label[x],
+    demo_vars = NULL,
+    covariates = NULL
+  )
+)
+names(tlbx_ancova_unadj) <- tlbx_label
+
+# extract tables from fit_ancova output
+tlbx_ancova_unadj_summary <- dplyr::bind_rows(
+  lapply(
+    names(tlbx_ancova_unadj),
+    function(x) {
+      tlbx_ancova_unadj[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-toolbox-ancova-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Toolbox - Unadjusted ANCOVA results showing LS means (95% CI) for baseline and 16-week change,
+#|    and between-group difference in changes (not adjusted for demographics). {data_caption}")
+
+tlbx_ancova_unadj_ft <- tlbx_ancova_unadj_summary |>
+  dplyr::select(-contrast_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 7, 7, 4)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 8, 15), part = "all") |>
+  flextable::autofit()
+
+tlbx_ancova_unadj_ft
+```
+
+```{r}
+#| label: fig-toolbox-ancova-unadjusted-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "Toolbox - Forest plot showing unadjusted between-group differences in changes. {data_caption}")
+
+plot_ancova_forest(
+  obj = tlbx_ancova_unadj,
+  labels = tlbx_label,
+  min_mult = 1.1,
+  max_mult = 1.1
+)
+```

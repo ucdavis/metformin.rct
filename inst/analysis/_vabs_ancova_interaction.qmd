@@ -1,0 +1,158 @@
+```{r}
+#| label: vabs-ancova-interaction
+#| include: false
+
+if (!vabs_incl_motor) {
+  vabs_var <- c(
+    "vabs3_rc_rs", "vabs3_ec_rs", "vabs3_wc_rs",
+    "vabs3_pd_rs", "vabs3_dd_rs",
+    "vabs3_cd_rs", "vabs3_is_rs",
+    "vabs3_ps_rs", "vabs3_cs_rs",
+    "vabs3_ac_ss", "vabs3_c_ss", "vabs3_dl_ss", "vabs3_s_ss"
+  )
+  vabs_label <- c(
+    "Receptive Raw Score",
+    "Expressive Raw Score",
+    "Written Raw Score",
+    "Personal Raw Score",
+    "Domestic Raw Score",
+    "Community Raw Score",
+    "Interpersonal Relationships Raw Score",
+    "Play & Leisure Time Raw Score",
+    "Coping Skills Raw Score",
+    "Adaptive Behavior Composite Standard Score",
+    "Communication Standard Score",
+    "Daily Living Skills Standard Score",
+    "Socialization Standard Score"
+  )
+  names(vabs_label) = vabs_var
+
+  # Raw variables: 1-9
+  # Standard variables: 10, 11, 12, 13
+  raw_vars <- vabs_var[c(1:9)]
+  standard_vars <- vabs_var[c(10, 11, 12, 13)]
+} else {
+  vabs_var <- c(
+    "vabs3_rc_rs", "vabs3_ec_rs", "vabs3_wc_rs",
+    "vabs3_pd_rs", "vabs3_dd_rs",
+    "vabs3_cd_rs", "vabs3_is_rs",
+    "vabs3_ps_rs", "vabs3_cs_rs",
+    "vabs3_gc_rs", "vabs3_fc_rs",
+    "vabs3_ac_ss", "vabs3_c_ss", "vabs3_dl_ss", "vabs3_s_ss", "vabs3_ms_ss"
+  )
+  vabs_label <- c(
+    "Receptive Raw Score",
+    "Expressive Raw Score",
+    "Written Raw Score",
+    "Personal Raw Score",
+    "Domestic Raw Score",
+    "Community Raw Score",
+    "Interpersonal Relationships Raw Score",
+    "Play & Leisure Time Raw Score",
+    "Coping Skills Raw Score",
+    "Gross Motor Raw Score",
+    "Fine Motor Raw Score",
+    "Adaptive Behavior Composite Standard Score",
+    "Communication Standard Score",
+    "Daily Living Skills Standard Score",
+    "Socialization Standard Score",
+    "Motor Skills Standard Score"
+  )
+  names(vabs_label) = vabs_var
+
+  # Raw variables: 1-11
+  # Standard variables: 12, 13, 14, 15, 16
+  raw_vars <- vabs_var[c(1:11)]
+  standard_vars <- vabs_var[c(12, 13, 14, 15, 16)]
+}
+
+# fit ANCOVA models with Treatment*Age Group interaction
+vabs_ancova_intrxn <- lapply(
+  vabs_var,
+  function(x) fit_ancova_interaction(
+    dataset = data,
+    outcome = x,
+    outcome_label = vabs_label[x],
+    covariates = NULL,
+    strata_var = strata_var,
+    strata_label = strata_label
+  )
+)
+names(vabs_ancova_intrxn) <- vabs_label
+
+# extract tables from fit_ancova_interaction output
+vabs_ancova_intrxn_summary <- dplyr::bind_rows(
+  lapply(
+    names(vabs_ancova_intrxn),
+    function(x) {
+      vabs_ancova_intrxn[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-vabs-ancova-interaction
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Vineland - ANCOVA results with Treatment*{strata_label} interaction showing LS means (95% CI)
+#|    for baseline and 16-week change, and between-group difference in changes stratified by age group.
+#|    {data_caption}")
+
+vabs_ancova_intrxn_ft <- vabs_ancova_intrxn_summary |>
+  dplyr::select(-interaction_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    strata_label = strata_label,
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI",
+    interaction_est = "Interaction Estimate",
+    interaction_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "", "Placebo", "Metformin", "Between-Group Differences", ""),
+    colwidths = c(1, 1, 7, 7, 4, 2)
+  ) |>
+  flextable::merge_v(j = c("Outcome", "interaction_est", "interaction_ci")) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1:2, align = "left", part = "all") |>
+  flextable::align(j = c(21, 22), align = "center", part = "body") |>
+  flextable::vline(j = c(2, 9, 16), part = "all") |>
+  flextable::autofit()
+
+vabs_ancova_intrxn_ft
+```
+
+```{r}
+#| label: fig-vabs-ancova-interaction-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "VABS - Forest plot showing Treatment*{strata_label} interaction term. {data_caption}")
+
+plot_ancova_interaction_forest(
+  obj = vabs_ancova_intrxn,
+  labels = vabs_label,
+  min_mult = 1.1,
+  max_mult = 1.1,
+  arrow_labs = strata_levels
+)
+```

@@ -1,0 +1,425 @@
+---
+title: "FXS Metformin Clinical Trial - Unadjusted ANCOVA Analyses"
+format:
+  docx:
+    reference-doc: landscape_template.docx
+    echo: false
+  html:
+    embed-resources: true
+    lightbox: true
+    toc: true
+    toc-depth: 3
+    echo: false
+    output-file: "metformin_ancova_unadjusted-2026-06-18.html"
+---
+
+```{r}
+#| include: false
+#| label: setup
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  include = TRUE,
+  warning = FALSE
+)
+
+ ggplot2::theme_set(ggplot2::theme_classic())
+```
+
+```{r}
+#| label: libraries
+#| message: false
+
+# library(metformin)
+devtools::load_all()
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(gtsummary)
+library(glmmTMB)
+library(ggtext)
+library(flextable)
+
+flextable::set_flextable_defaults(
+  theme_fun = flextable::theme_vanilla
+)
+```
+
+{{< include _data_preparation.qmd >}}
+
+```{r}
+#| label: specify-analytic-data
+#| include: false
+
+data <- met_analytic
+covariates <- c("demo_age_center", "sex", "leit3_nv_iq_center")
+
+vabs_incl_motor <- FALSE
+
+demog_tbl_width = 1.25
+stratified_tbl_width = 1
+
+small_tbl_width = 1.2
+main_tbl_width = 0.61
+
+error_bar_caption = "Error bars indicate standard error."
+data_caption = c("Analysis conducted using English & French speaking participants.")
+
+data_caption_els = c("Analysis conducted using English speaking participants.")
+```
+
+# Introduction
+
+Unadjusted ANCOVA analyses using all data (Eng + Fr speakers). These analyses 
+compare Week 16 outcomes between treatment groups while adjusting for 
+baseline values and site (and total number of utterances for the ELS measures).
+
+## Demographics for ELS ANCOVA Subjects
+
+The following tables present baseline demographic characteristics limited to 
+subjects with complete ANCOVA data for ELS outcomes, stratified by:
+1. All subjects
+2. Age 6-11 (with p-values for Met vs. Placebo within this age group)
+3. Age 12+ (with p-values for Met vs. Placebo within this age group)
+
+{{< include _demographics_ancova_els.qmd >}}
+
+## ANCOVA Analyses (Unadjusted)
+
+{{< include _ancova_unadjusted.qmd >}}
+
+## Primary Unadjusted ANCOVA Results Table
+
+```{r}
+#| label: primary-ancova-unadjusted-table
+#| include: false
+
+# Primary outcomes table (ELS only)
+primary_ancova_unadj_summary <- els_ancova_unadj_summary
+```
+
+```{r}
+#| label: tbl-primary-ancova-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Primary Unadjusted ANCOVA Results - ELS Outcomes. Unadjusted ANCOVA results showing LS means (95% CI) for baseline and 16-week change, and between-group difference in changes (not adjusted for demographics). {data_caption}")
+
+primary_ancova_unadj_ft <- primary_ancova_unadj_summary |>
+  dplyr::select(
+    Outcome, n_p, baseline_p, baseline_p_ci, p_change, p_change_ci,
+    n_m, baseline_m, baseline_m_ci, m_change, m_change_ci,
+    baseline_contrast_mean, baseline_contrast_ci,
+    contrast_mean, contrast_ci, contrast_p
+  ) |> 
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "ELS Outcome",
+    n_p = "N",
+    baseline_p = "LS Mean",
+    baseline_p_ci = "95% CI",
+    p_change = "LS Mean",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "LS Mean",
+    baseline_m_ci = "95% CI",
+    m_change = "LS Mean",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "LS Mean",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "LS Mean",
+    contrast_ci = "95% CI",
+    contrast_p = "p-value"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "",
+               "Baseline", "16-week Change", "", 
+               rep(c("Baseline", "16-week Change"), 2)),
+    colwidths = c(1, 1, 2, 2, 1, 2, 2, 2, 3)
+  ) |> 
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Metformin vs. Placebo"),
+    colwidths = c(1, 5, 5, 5)
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Within-Group Comparison", "Between-Group Comparison"),
+    colwidths = c(1, 10, 5)
+  ) |> 
+  flextable::theme_vanilla() |>
+  flextable::align(i = 4, align = "left", part = "header") |>
+  flextable::align(i = c(1, 2, 3), align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 6, 11), part = "all") |>
+  flextable::vline(
+    j = c(2, 3, 4, 5, 7, 8, 9, 10, 13, 15),
+    part = "header",
+    border = officer::fp_border(color = "black", width = 1)
+  ) |>
+  flextable::vline(
+    j = c(2, 3, 4, 5, 7, 8, 9, 10, 13, 15),
+    part = "body",
+    border = officer::fp_border(color = "black", width = 1)
+  ) |>
+   flextable::hline(
+     i = c(1, 3),
+     part = "header",
+     border = officer::fp_border(color = "black", width = 1)
+   ) |>
+   flextable::hline(
+     i = nrow(primary_ancova_unadj_summary),
+     part = "body",
+     border = officer::fp_border(color = "black", width = 1)
+  ) |> 
+  flextable::autofit()
+
+primary_ancova_unadj_ft
+```
+
+## Secondary Unadjusted ANCOVA Results Table
+
+```{r}
+#| label: secondary-ancova-unadjusted-table
+#| include: false
+
+# Filter Vineland to Raw Score and Standard Score outcomes
+vabs_unadj_raw_stnd_only <- vabs_ancova_unadj_summary |>
+  dplyr::filter(stringr::str_detect(Outcome, "Raw Score") | 
+                  stringr::str_detect(Outcome, "Standard Score"))
+
+# Combine all secondary outcomes (with filtered Vineland)
+secondary_ancova_unadj_summary <- dplyr::bind_rows(
+    bmi_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "BMI",
+        .before = 1
+      ),
+    abc_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "ABC",
+        .before = 1
+      ),
+    adams_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "ADAMS",
+        .before = 1
+      ),
+    pql_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "Peds QL",
+        .before = 1
+      ),
+    cshq_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "CSHQ",
+        .before = 1
+      ),
+    snap_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "SNAP-IV",
+        .before = 1
+      ),
+    vas_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "VAS",
+        .before = 1
+      ),
+    vabs_unadj_raw_stnd_only |>
+      dplyr::mutate(
+        Instrument = "Vineland",
+        .before = 1
+      ),
+    biomarker_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "Biomarkers",
+        .before = 1
+      ),
+    tlbx_ancova_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "Toolbox",
+        .before = 1
+      ),
+    eye_ancova_z_unadj_summary |>
+      dplyr::mutate(
+        Instrument = "Eye Tracking",
+        .before = 1
+      )
+) |> 
+  flextable::as_grouped_data(groups = "Instrument") |> 
+  dplyr::mutate(
+    Outcome = ifelse(
+      is.na(Outcome),
+      Instrument,
+      Outcome
+    )
+  )
+```
+
+```{r}
+#| label: tbl-secondary-ancova-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Secondary Unadjusted ANCOVA Results - All Secondary Outcomes (Vineland restricted to Raw Scores). Unadjusted ANCOVA results showing LS means (95% CI) for baseline and 16-week change, and between-group difference in changes (not adjusted for demographics). {data_caption}")
+
+secondary_ancova_unadj_ft <- secondary_ancova_unadj_summary |>
+  dplyr::select(
+    Outcome, n_p, baseline_p, baseline_p_ci, p_change, p_change_ci,
+    n_m, baseline_m, baseline_m_ci, m_change, m_change_ci,
+    baseline_contrast_mean, baseline_contrast_ci,
+    contrast_mean, contrast_ci
+  ) |> 
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "ELS Outcome",
+    n_p = "N",
+    baseline_p = "LS Mean",
+    baseline_p_ci = "95% CI",
+    p_change = "LS Mean",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "LS Mean",
+    baseline_m_ci = "95% CI",
+    m_change = "LS Mean",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "LS Mean",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "LS Mean",
+    contrast_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "",
+               "Baseline", "16-week Change", "", 
+               rep(c("Baseline", "16-week Change"), 2)),
+    colwidths = c(1, 1, 2, 2, 1, 2, 2, 2, 2)
+  ) |> 
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Metformin vs. Placebo"),
+    colwidths = c(1, 5, 5, 4)
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Within-Group Comparison", "Between-Group Comparison"),
+    colwidths = c(1, 10, 4)
+  ) |> 
+  flextable::theme_vanilla() |>
+  flextable::align(i = 4, align = "left", part = "header") |>
+  flextable::align(i = c(1, 2, 3), align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 6, 11), part = "all") |>
+  flextable::vline(
+    j = c(2, 3, 4, 5, 7, 8, 9, 10, 13, 15),
+    part = "header",
+    border = officer::fp_border(color = "black", width = 1)
+  ) |>
+  flextable::vline(
+    j = c(2, 3, 4, 5, 7, 8, 9, 10, 13, 15),
+    part = "body",
+    border = officer::fp_border(color = "black", width = 1)
+  ) |>
+   flextable::hline(
+     i = c(1, 3),
+     part = "header",
+     border = officer::fp_border(color = "black", width = 1)
+   ) |>
+   flextable::hline(
+     i = nrow(primary_ancova_unadj_summary),
+     part = "body",
+     border = officer::fp_border(color = "black", width = 1)
+  ) |> 
+  flextable::autofit()
+
+secondary_ancova_unadj_ft
+```
+
+```{r}
+#| label: export-tables
+#| echo: false
+#| include: false
+
+strata <- "all_data_unadjusted"
+
+# Create workbook
+wb <- openxlsx2::wb_workbook()
+
+# Add each ANCOVA table as a separate sheet with flextable formatting
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Demographics")
+wb <- flexlsx::wb_add_flextable(
+  wb, sheet = "Demographics", ft = demog_merged_ft, 
+  start_col = 3, start_row = 3
+)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "ELS")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "ELS", ft = els_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "BMI")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "BMI", ft = bmi_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "ABC")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "ABC", ft = abc_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "ADAMS")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "ADAMS", ft = adams_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Peds QL")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Peds QL", ft = pql_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "CSHQ")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "CSHQ", ft = cshq_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "SNAP-IV")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "SNAP-IV", ft = snap_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "VAS")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "VAS", ft = vas_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "CGI")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "CGI", ft = cgi_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Vineland")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Vineland", ft = vabs_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Biomarkers")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Biomarkers", ft = biomarker_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Toolbox")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Toolbox", ft = tlbx_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Eye Tracking")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Eye Tracking", ft = eye_ancova_z_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Primary Results")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Primary Results", 
+                                ft = primary_ancova_unadj_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Secondary Results")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Secondary Results", 
+                                ft = secondary_ancova_unadj_ft)
+
+# Save model result tables (not flextables) for each instrument
+ancova_model_results_tables <- list(
+  ELS = els_ancova_unadj_summary,
+  BMI = bmi_ancova_unadj_summary,
+  ABC = abc_ancova_unadj_summary,
+  ADAMS = adams_ancova_unadj_summary,
+  PedsQL = pql_ancova_unadj_summary,
+  CSHQ = cshq_ancova_unadj_summary,
+  `SNAP-IV` = snap_ancova_unadj_summary,
+  VAS = vas_ancova_unadj_summary,
+  CGI = cgi_ancova_unadj_summary,
+  Vineland = vabs_ancova_unadj_summary,
+  Biomarkers = biomarker_ancova_unadj_summary,
+  Toolbox = tlbx_ancova_unadj_summary,
+  `Eye Tracking` = eye_ancova_z_unadj_summary
+)
+
+saveRDS(
+  object = ancova_model_results_tables,
+  file = glue::glue("metformin_{strata}_ancova_model_results_tables.rds")
+)
+
+# Save workbook
+openxlsx2::wb_save(
+  wb = wb,
+  file = glue::glue("metformin_{strata}_ancova_tables.xlsx"),
+  overwrite = TRUE
+)
+```

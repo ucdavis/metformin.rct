@@ -1,0 +1,73 @@
+```{r}
+#| label: biomarker-data-prep
+#| include: false
+
+tmp <- ucd_clean |> 
+  dplyr::filter(fxs_sts_id %in% data$fxs_sts_id) |> 
+  dplyr::group_by(fxs_sts_id) |>
+  # fill in measurements only collected at baseline
+  tidyr::fill(demo_age, .direction = "down") |>
+  tidyr::fill(leit3_nv_iq, .direction = "down") |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    Treatment = dplyr::if_else(
+      Treatment == "Control", "Placebo", Treatment
+    ) |> 
+      factor(levels = c("Placebo", "Metformin")),
+    dplyr::across(
+      .cols = c(demo_age, leit3_nv_iq),
+      ~ .x - mean(.x, na.rm = TRUE),
+      .names = "{col}_center"
+    ),
+    Site = "UCD",
+    cgis_soi_fct = dplyr::case_when(
+      (cgis_soi == "1 = Normal" | 
+         cgis_soi == "2 = Borderline Ill") ~ "< 3 = Normal, Borderline Ill",
+      .default = cgis_soi
+    ) |>
+      factor(
+        levels = c(
+          "< 3 = Normal, Borderline Ill",
+          "3 = Mildly Ill", "4 = Moderately Ill", "5 = Markedly Ill",
+          "6 = Severely Ill", "7 = Among the Most Extremely Ill Patients"
+        )
+      )
+  ) |> 
+  dplyr::select(
+    fxs_sts_id, redcap_event_name, Treatment, Site,
+    tassone_fmr1, tassone_cyfip1, tassone_mmp9, fmrp_rhmc, demo_age_center,
+    leit3_nv_iq_center, sex, demo_age, leit3_nv_iq, Molecular.Category,
+    Race, Ethnicity, weight_kg, cgis_soi_fct
+  ) |> 
+  # set mmp9 to missing for week 8 (only 1 observation)
+  dplyr::mutate(
+    tassone_mmp9 = dplyr::if_else(
+      (fxs_sts_id == "101990-100" & 
+        redcap_event_name ==  "Week 8 Visit (Visit 2)"),
+      NA,
+      tassone_mmp9
+    )
+  )
+
+# log transform data use log(x + 0.5min(x))
+fmr1_hm <- min(tmp[tmp$tassone_fmr1 > 0, ]$tassone_fmr1, na.rm = TRUE) / 2
+cyfip_hm <- min(tmp[tmp$tassone_cyfip1 > 0, ]$tassone_cyfip1, na.rm = TRUE) / 2
+mmp9_hm <- min(tmp[tmp$tassone_mmp9 > 0, ]$tassone_mmp9, na.rm = TRUE) / 2
+fmrp_hm <- min(tmp[tmp$fmrp_rhmc > 0, ]$fmrp_rhmc, na.rm = TRUE) / 2
+
+tmp <- tmp |> 
+  dplyr::mutate(
+    tassone_fmr1_log = log(tassone_fmr1 + fmr1_hm),
+    tassone_cyfip1_log = log(tassone_cyfip1 + cyfip_hm),
+    tassone_mmp9_log = log(tassone_mmp9 + mmp9_hm),
+    fmrp_rhmc_log = log(fmrp_rhmc + fmrp_hm),
+    age_group = dplyr::case_when(
+      demo_age < 12 ~ "Age 6-11",
+      demo_age >= 12 ~ "Age 12+"
+    ) |>
+      factor(levels = c("Age 6-11", "Age 12+")
+    )
+  )
+
+biomarker_data <- tmp
+```

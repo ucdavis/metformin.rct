@@ -1,0 +1,97 @@
+```{r}
+#| label: abc-ancova
+#| include: false
+
+abc_var <- c("abc_comp_rev", met_cols[grepl("ss_", met_cols)])
+abc_label <- c(
+  "Composite Score", "Irritability", "Socially Unresponsive / Lethargic",
+  "Stereotypy", "Hyperactivity", "Inappropriate Speech", "Social Avoidance"
+)
+
+names(abc_label) = abc_var
+
+# fit ANCOVA models
+abc_ancova <- lapply(
+  abc_var,
+  function(x) fit_ancova(
+    dataset = data,
+    outcome = x,
+    outcome_label = abc_label[x],
+    covariates = NULL
+  )
+)
+names(abc_ancova) <- abc_label
+
+# extract tables from fit_ancova output
+abc_ancova_summary <- dplyr::bind_rows(
+  lapply(
+    names(abc_ancova),
+    function(x) {
+      abc_ancova[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-abc-ancova
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "ABC - ANCOVA results showing LS means (95% CI) for baseline and 16-week change,
+#|    and between-group difference in changes. {data_caption}")
+
+abc_ancova_ft <- abc_ancova_summary |>
+  dplyr::select(-contrast_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 7, 7, 4)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 8, 15), part = "all") |>
+  flextable::autofit()
+
+abc_ancova_ft
+```
+
+```{r}
+#| label: fig-abc-ancova-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "ABC - Forest plot showing between-group differences in changes. {data_caption}")
+
+abc_ancova_list <- lapply(abc_ancova, function(x) list("fit" = x$fit$fit))
+
+
+plot_ancova_forest(
+  obj = abc_ancova_list,
+  labels = abc_label,
+  arrow_labs = flipped_labs,
+  min_mult = 1.1,
+  max_mult = 5
+)
+```

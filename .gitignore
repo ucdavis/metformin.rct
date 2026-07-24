@@ -52,3 +52,7 @@ rsconnect/
 # data files
 data/
 inst/extdata/
+inst/analysis/*.png
+inst/analysis/*.xlsx
+inst/analysis/*.html
+inst/analysis/*.rds

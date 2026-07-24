@@ -1,0 +1,193 @@
+```{r}
+#| label: eyetracking-ancova-zscore-unadjusted-data
+#| include: false
+
+# import data
+eye_raw <- read.csv(
+  file = "../data-ext/MET_AOI_FOR_ANALYSIS.csv"
+)
+
+# restrict data to those with data at baseline and wk 16
+eye_data <- eye_raw |>
+  dplyr::mutate(
+    Count = dplyr::n(),
+    .by = ID
+  ) |>
+  dplyr::filter(
+    Count > 1
+  ) |>
+  # id 18-2-004 has 2 obs for visit 3, remove where screen_lvp = 51.2713902
+  dplyr::filter(
+    !(ID == "18-2-004" & Entire_Screen_Face_Pct_LvP == 51.2713902)
+  ) |>
+  dplyr::rename(fxs_sts_id = ID)
+
+# extract id from met_analytic to ensure eye tracking data is only for those
+# in our analytic dataset
+analytic_ids <- metformin.rct::met_analytic |>
+  dplyr::select(Source, fxs_sts_id, rand_code) |>
+  unique() |>
+  dplyr::mutate(
+    id = dplyr::if_else(
+      Source == "UCD",
+      rand_code,
+      fxs_sts_id |> gsub("FXSMET-", "", x = _)
+    )
+  ) |>
+  dplyr::pull(id) |>
+  unique()
+
+eye_data <- eye_data |>
+  dplyr::filter(fxs_sts_id %in% analytic_ids)
+
+# get subj data from met_analytic (Treatment, age, sex, IQ)
+eye_demog <- metformin.rct::met_analytic |>
+  dplyr::filter(redcap_event_name == "Baseline Visit (Visit 1)") |>
+  dplyr::select(Source, Site, fxs_sts_id, rand_code,
+                demo_age, sex, leit3_nv_iq, Molecular.Category, Treatment) |>
+  dplyr::mutate(
+    ID = dplyr::case_when(
+      Source == "UCD" ~ rand_code,
+      Source == "Canada" ~ gsub("FXSMET-", "", fxs_sts_id)
+    ),
+    .after = Source
+  ) |>
+  dplyr::select(-c(Source, fxs_sts_id, rand_code)) |>
+  dplyr::rename(fxs_sts_id = ID)
+
+## analytic data: join demographics and add redcap_event_name
+eye_ancova_zscore_unadj_data <- eye_data |>
+  dplyr::left_join(
+    x = _,
+    y = eye_demog,
+    by = "fxs_sts_id"
+  ) |>
+  dplyr::mutate(
+    redcap_event_name = dplyr::case_when(
+      Visit == 1 ~ "Baseline Visit (Visit 1)",
+      Visit == 2 ~ "Week 8 Visit (Visit 2)",
+      Visit == 3 ~ "Week 16 (Visit 3/Early Term)"
+    )
+  ) |>
+  # Restrict to baseline and week 16 for time-specific z-score computation
+  dplyr::filter(Visit %in% c(1, 3)) |>
+  # Compute time-specific z-scores within each Visit
+  dplyr::group_by(Visit) |>
+  dplyr::mutate(
+    # Z-score for All_Face_Pct_vP
+    All_Face_Pct_vP_z = scale(All_Face_Pct_vP)[, 1],
+    # Z-scores for each Emotion x AOI variable
+    dplyr::across(
+      .cols = c(
+        Happy_Eyes_Pct, Calm_Eyes_Pct, Fear_Eyes_Pct,
+        Happy_Nose_Pct, Calm_Nose_Pct, Fear_Nose_Pct,
+        Happy_Mouth_Pct, Calm_Mouth_Pct, Fear_Mouth_Pct
+      ),
+      ~ scale(.x)[, 1],
+      .names = "{.col}_z"
+    )
+  ) |>
+  dplyr::ungroup() |>
+  # Compute composite z-scores (sum of Emotion z-scores per AOI)
+  dplyr::mutate(
+    Eyes_zscore  = (Happy_Eyes_Pct_z + Calm_Eyes_Pct_z + Fear_Eyes_Pct_z) / 3,
+    Nose_zscore  = (Happy_Nose_Pct_z + Calm_Nose_Pct_z + Fear_Nose_Pct_z) / 3,
+    Mouth_zscore = (Happy_Mouth_Pct_z + Calm_Mouth_Pct_z + Fear_Mouth_Pct_z) / 3
+  )
+
+## define z-score outcomes
+eye_zscore_var <- c(
+  "All_Face_Pct_vP_z",
+  "Eyes_zscore", "Nose_zscore", "Mouth_zscore"
+)
+eye_zscore_label <- c(
+  "Face vP (z-score)",
+  "Eyes (composite z-score)", "Nose (composite z-score)", "Mouth (composite z-score)"
+)
+names(eye_zscore_label) <- eye_zscore_var
+
+# fit unadjusted ANCOVA models (not adjusted for demographics)
+eye_ancova_z_unadj <- lapply(
+  eye_zscore_var,
+  function(x) fit_ancova(
+    dataset = eye_ancova_zscore_unadj_data,
+    outcome = x,
+    outcome_label = eye_zscore_label[x],
+    demo_vars = NULL,
+    covariates = NULL
+  )
+)
+names(eye_ancova_z_unadj) <- eye_zscore_label
+
+# extract tables from fit_ancova output
+eye_ancova_z_unadj_summary <- dplyr::bind_rows(
+  lapply(
+    names(eye_ancova_z_unadj),
+    function(x) {
+      eye_ancova_z_unadj[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-eyetracking-ancova-zscore-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Eye Tracking Z-score Unadjusted ANCOVA - Unadjusted ANCOVA results showing LS means (95% CI) for baseline
+#|    and 16-week change, and between-group difference in changes (not adjusted for demographics).
+#|    All_Face_Pct_vP is z-scored within each timepoint. Eyes, Nose, and Mouth outcomes are composite z-scores
+#|    (mean of Emotion-specific z-scores within each timepoint). {data_caption}")
+
+eye_ancova_z_unadj_ft <- eye_ancova_z_unadj_summary |>
+  dplyr::select(-contrast_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 7, 7, 4)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 8, 15), part = "all") |>
+  flextable::autofit()
+
+eye_ancova_z_unadj_ft
+```
+
+```{r}
+#| label: fig-eyetracking-ancova-zscore-unadjusted-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "Eye Tracking Z-score Unadjusted ANCOVA - Forest plot showing unadjusted between-group differences
+#|    in changes. {data_caption}")
+
+plot_ancova_forest(
+  obj = eye_ancova_z_unadj,
+  labels = eye_zscore_label,
+  min_mult = 1.1,
+  max_mult = 1.1
+)
+```

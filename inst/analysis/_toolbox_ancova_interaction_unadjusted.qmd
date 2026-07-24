@@ -1,0 +1,127 @@
+```{r}
+#| label: toolbox-ancova-interaction-unadjusted
+#| include: false
+
+tlbx_ancova_unadj_data <- metformin.rct::met_tlbx_clean |>
+  dplyr::mutate(
+    dplyr::across(
+      .cols = dplyr::ends_with("_analytic"),
+      ~ dplyr::if_else(.x < 0, NA_real_, .x)
+    ),
+    age_group = dplyr::case_when(
+      demo_age < 12 ~ "Age 6-11",
+      demo_age >= 12 ~ "Age 12+"
+    ) |>
+      factor(levels = c("Age 6-11", "Age 12+"))
+  ) |>
+  dplyr::left_join(
+    x = _,
+    y = metformin.rct::met_analytic |>
+      dplyr::filter(redcap_event_name == "Baseline Visit (Visit 1)") |>
+      dplyr::select(fxs_sts_id, Molecular.Category) |>
+      unique(),
+    by = "fxs_sts_id"
+  )
+
+tlbx_var <- c(
+  "tcb_read_analytic", "tcb_vocb_analytic", "tcb_ptrncomp_analytic",
+  "tcb_dccs_analytic", "tcb_flnkr_analytic", "tcb_picseq_analytic",
+  "tcb_crystl_analytic"
+)
+tlbx_label <- c(
+  "Oral Reading", "Picture Vocabulary", "Pattern Comparison",
+  "DCCS", "Flanker", "Picture Sequence", "Crystal Composite"
+)
+names(tlbx_label) <- tlbx_var
+
+# fit ANCOVA models with Treatment*strata_var interaction (unadjusted for demographics)
+tlbx_ancova_intrxn_unadj <- lapply(
+  tlbx_var,
+  function(x) fit_ancova_interaction(
+    dataset = tlbx_ancova_unadj_data,
+    outcome = x,
+    outcome_label = tlbx_label[x],
+    demo_vars = NULL,
+    covariates = NULL,
+    strata_var = strata_var,
+    strata_label = strata_label
+  )
+)
+names(tlbx_ancova_intrxn_unadj) <- tlbx_label
+
+# extract tables from fit_ancova_interaction output
+tlbx_ancova_intrxn_unadj_summary <- dplyr::bind_rows(
+  lapply(
+    names(tlbx_ancova_intrxn_unadj),
+    function(x) {
+      tlbx_ancova_intrxn_unadj[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-toolbox-ancova-interaction-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Toolbox - Unadjusted ANCOVA results with Treatment*{strata_label} interaction showing LS means (95% CI)
+#|    for baseline and 16-week change, and between-group difference in changes stratified by {strata_label}
+#|    (not adjusted for demographics). {data_caption}")
+
+tlbx_ancova_intrxn_unadj_ft <- tlbx_ancova_intrxn_unadj_summary |>
+  dplyr::select(-interaction_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    strata_label = strata_label,
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI",
+    interaction_est = "Interaction Estimate",
+    interaction_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "", "Placebo", "Metformin", "Between-Group Differences", ""),
+    colwidths = c(1, 1, 7, 7, 4, 2)
+  ) |>
+  flextable::merge_v(j = c("Outcome", "interaction_est", "interaction_ci")) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1:2, align = "left", part = "all") |>
+  flextable::align(j = c(21, 22), align = "center", part = "body") |>
+  flextable::vline(j = c(2, 9, 16), part = "all") |>
+  flextable::autofit()
+
+tlbx_ancova_intrxn_unadj_ft
+```
+
+```{r}
+#| label: fig-toolbox-ancova-interaction-unadjusted-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "Toolbox - Forest plot showing Treatment*{strata_label} interaction term (unadjusted). {data_caption}")
+
+plot_ancova_interaction_forest(
+  obj = tlbx_ancova_intrxn_unadj,
+  labels = tlbx_label,
+  min_mult = 1.1,
+  max_mult = 1.1,
+  arrow_labs = strata_levels
+)
+```

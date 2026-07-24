@@ -1,0 +1,98 @@
+```{r}
+#| label: els-ancova-unadjusted
+#| include: false
+
+els_var <- c("nar_ndw50_a", "con_ndw50_a")
+els_label <- c(
+  "Narrative NDW50",
+  "Conversation NDW50"
+)
+els_covariates <- c("nar_totnumut_a", "con_totnumut_a")
+names(els_label) = els_var
+names(els_covariates) = els_var
+
+# fit ANCOVA models (unadjusted for demographics)
+els_ancova_unadj <- lapply(
+  els_var,
+  function(x) fit_ancova(
+    dataset = data,
+    outcome = x,
+    outcome_label = els_label[x],
+    demo_vars = NULL,
+    covariates = els_covariates[x] |> unname()
+  )
+)
+names(els_ancova_unadj) <- els_label
+
+# extract tables from fit_ancova output
+els_ancova_unadj_summary <- dplyr::bind_rows(
+  lapply(
+    names(els_ancova_unadj),
+    function(x) {
+      els_ancova_unadj[[x]]$tbl
+    }
+  )
+)
+
+# Note: Plots will be added in a future iteration
+```
+
+```{r}
+#| label: tbl-els-ancova-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "ELS - Unadjusted ANCOVA results showing LS means (95% CI) for baseline and 16-week change,
+#|    and between-group difference in changes (not adjusted for demographics). {data_caption}")
+
+els_ancova_unadj_ft <- els_ancova_unadj_summary |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI",
+    contrast_p = "p-value"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 7, 7, 5)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "center", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 8, 15), part = "all") |>
+  flextable::autofit()
+
+els_ancova_unadj_ft
+```
+
+```{r}
+#| label: fig-els-ancova-unadjusted-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "ELS - Forest plot showing unadjusted between-group differences in changes. {data_caption_els}")
+
+plot_ancova_forest(
+  obj = els_ancova_unadj,
+  labels = els_label,
+  min_mult = 1.1,
+  max_mult = 1.1
+)
+```
+

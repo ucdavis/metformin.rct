@@ -1,0 +1,95 @@
+```{r}
+#| label: met-demographics
+#| include: false
+
+demographic_variables <- c(
+  "demo_age", "sex", "Race", "Ethnicity", "weight_kg", 
+  "leit3_nv_iq", "cgis_soi_fct", "Molecular.Category"
+)
+
+demographic_labels <- list(
+  "demo_age" = "Age (years)", 
+  "sex" = "Sex", 
+  "Race" = "Race", 
+  "Ethnicity" = "Ethnicity", 
+  "weight_kg" = "Weight (kg)", 
+  "leit3_nv_iq" = "IQ",
+  "cgis_soi_fct" = "CGIS Severity of Illness", 
+  "Molecular.Category" = "Molecular Category"
+)
+
+demog_tbl <- data |> 
+  dplyr::filter(
+    redcap_event_name == "Baseline Visit (Visit 1)"
+  ) |> 
+  gtsummary::tbl_summary(
+    by = Treatment,
+    label = demographic_labels,
+    type = c(demo_age, weight_kg, leit3_nv_iq) ~ "continuous",
+        statistic = c(demo_age, weight_kg, leit3_nv_iq) ~ c("{mean} ({sd})"),
+    include = dplyr::all_of(demographic_variables),
+    digits = list(c(demo_age, weight_kg, leit3_nv_iq) ~ c(1, 1, 0, 0, 0)),
+    missing_text = "Missing"
+  ) |> 
+  gtsummary::add_overall() |> 
+  gtsummary::add_p(
+    pvalue_fun = gtsummary::label_style_pvalue(digits = 3)
+  ) |> 
+  gtsummary::separate_p_footnotes() |> 
+      gtsummary::modify_table_body(
+        ~ .x |> 
+          dplyr::filter(
+            !(row_type == "level" & 
+                dplyr::if_all(
+                  .cols = gtsummary::all_stat_cols(), 
+                  ~ .x == "0 (0%)"
+                )
+              )
+          )
+      )
+
+demog_tbl_stratified <- data |> 
+  dplyr::filter(
+    redcap_event_name == "Baseline Visit (Visit 1)"
+  ) |> 
+  gtsummary::tbl_strata(
+    strata = Treatment,
+    .tbl_fun = ~ .x |> 
+      gtsummary::tbl_summary(
+        by = Site,
+        label = demographic_labels,
+        include = dplyr::all_of(demographic_variables)
+      ) |> 
+      gtsummary::modify_table_body(
+        ~ .x |> 
+          dplyr::filter(
+            !(row_type == "level" & 
+                dplyr::if_all(
+                  .cols = gtsummary::all_stat_cols(), 
+                  ~ .x == "0 (0%)"
+                )
+              )
+          )
+      )
+  )
+```
+
+```{r}
+#| label: tbl-demograpic
+#| tbl-cap: "Characteristics of the study cohort, all three sites combined, by treatment."
+
+demog_tbl |> 
+  gtsummary::as_flex_table() |> 
+  flextable::width(width = demog_tbl_width)
+```
+
+\
+
+```{r}
+#| label: tbl-demographic-stratified
+#| tbl-cap: "Characteristics of the study cohort by study site and treatment."
+
+demog_tbl_stratified |> 
+  gtsummary::as_flex_table() |> 
+  flextable::width(width = stratified_tbl_width)
+```

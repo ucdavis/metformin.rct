@@ -1,0 +1,105 @@
+```{r}
+#| label: adams-ancova-interaction-unadjusted
+#| include: false
+
+adams_var <- c("adams_manic", "adams_depress", "adams_avoid", "adams_anxious",
+               "adams_obsess")
+adams_label <- c(
+  "Manic/Hyperactive Behavior Total", "Depressed Mood Total",
+  "Social Avoidance Total", "General Anxiety Total",
+  "Obsessive/Compulsive Behavior Total"
+)
+
+names(adams_label) = adams_var
+
+# fit ANCOVA models with Treatment*Age Group interaction (unadjusted for demographics)
+adams_ancova_intrxn_unadj <- lapply(
+  adams_var,
+  function(x) fit_ancova_interaction(
+    dataset = data,
+    outcome = x,
+    outcome_label = adams_label[x],
+    demo_vars = NULL,
+    covariates = NULL,
+    strata_var = strata_var,
+    strata_label = strata_label
+  )
+)
+names(adams_ancova_intrxn_unadj) <- adams_label
+
+# extract tables from fit_ancova_interaction output
+adams_ancova_intrxn_unadj_summary <- dplyr::bind_rows(
+  lapply(
+    names(adams_ancova_intrxn_unadj),
+    function(x) {
+      adams_ancova_intrxn_unadj[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-adams-ancova-interaction-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "ADAMS - Unadjusted ANCOVA results with Treatment*Age Group interaction showing LS means (95% CI)
+#|    for baseline and 16-week change, and between-group difference in changes stratified by age group
+#|    (not adjusted for demographics). {data_caption}")
+
+adams_ancova_intrxn_unadj_ft <- adams_ancova_intrxn_unadj_summary |>
+  dplyr::select(-interaction_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    Age_Group = "Age Group",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI",
+    interaction_est = "Interaction Estimate",
+    interaction_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "", "Placebo", "Metformin", "Between-Group Differences", ""),
+    colwidths = c(1, 1, 7, 7, 4, 2)
+  ) |>
+  flextable::merge_v(j = c("Outcome", "interaction_est", "interaction_ci")) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1:2, align = "left", part = "all") |>
+  flextable::align(j = c(21, 22), align = "center", part = "body") |>
+  flextable::vline(j = c(2, 9, 16), part = "all") |>
+  flextable::autofit()
+
+adams_ancova_intrxn_unadj_ft
+```
+
+```{r}
+#| label: fig-adams-ancova-interaction-unadjusted-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "ADAMS - Forest plot showing Treatment*Age Group interaction term (unadjusted). {data_caption}")
+
+plot_ancova_interaction_forest(
+  obj = adams_ancova_intrxn_unadj,
+  labels = adams_label,
+  min_mult = 1.1,
+  max_mult = 1.1,
+  arrow_labs = strata_levels
+)
+```

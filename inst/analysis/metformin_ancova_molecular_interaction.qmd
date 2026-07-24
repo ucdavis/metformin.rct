@@ -1,0 +1,289 @@
+---
+title: "FXS Metformin Clinical Trial - ANCOVA Analyses with Treatment*Molecular Category Interaction"
+format:
+  docx:
+    reference-doc: landscape_template.docx
+    echo: false
+  html:
+    embed-resources: true
+    lightbox: true
+    toc: true
+    toc-depth: 3
+    echo: false
+    output-file: "metformin_ancova_molecular_intrxn-2026-06-17.html"
+---
+
+```{r}
+#| include: false
+#| label: setup
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  include = TRUE,
+  warning = FALSE
+)
+
+ ggplot2::theme_set(ggplot2::theme_classic())
+```
+
+```{r}
+#| label: libraries
+#| message: false
+
+# library(metformin)
+devtools::load_all()
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(gtsummary)
+library(glmmTMB)
+library(ggtext)
+library(flextable)
+
+flextable::set_flextable_defaults(
+  theme_fun = flextable::theme_vanilla
+)
+```
+
+{{< include _data_preparation.qmd >}}
+
+```{r}
+#| label: specify-analytic-data
+#| include: false
+
+data <- met_analytic
+covariates <- c("demo_age_center", "sex", "leit3_nv_iq_center")
+strata_var = "Molecular.Category"
+strata_label = "Molecular Category"
+strata_levels = levels(data[[strata_var]])
+
+
+vabs_incl_motor <- FALSE
+
+demog_tbl_width = 1.25
+stratified_tbl_width = 1
+
+small_tbl_width = 1.2
+main_tbl_width = 0.61
+
+error_bar_caption = "Error bars indicate standard error."
+data_caption = c("Analysis conducted using English & French speaking participants.")
+
+data_caption_els = c("Analysis conducted using English speaking participants.")
+```
+
+# Introduction
+
+ANCOVA analyses with Treatment*Molecular Category (Full vs Mosaic) interaction using all data (Eng + Fr speakers). These analyses compare
+Week 16 outcomes between treatment groups while adjusting for baseline values,
+site, and covariates (age [centered], nonverbal IQ [centered], and sex), and include
+an interaction term between Treatment and Molecular Category.
+Additionally, ELS outcomes also adjusted for total number of utterances.
+
+Results are stratified by molecular category, showing treatment effects separately for
+Full and Mosaic methylation participants, along with the p-value for the interaction term.
+
+# ELS
+
+{{< include _els_ancova_interaction.qmd >}}
+
+# BMI
+
+{{< include _bmi_ancova_interaction.qmd >}}
+
+# ABC
+
+{{< include _abc_ancova_interaction.qmd >}}
+
+# ADAMS
+
+{{< include _adams_ancova_interaction.qmd >}}
+
+# PedsQL
+
+{{< include _pql_ancova_interaction.qmd >}}
+
+# CSHQ
+
+{{< include _cshq_ancova_interaction.qmd >}}
+
+# SNAP-IV
+
+{{< include _snap_ancova_interaction.qmd >}}
+
+# VAS
+
+{{< include _vas_ancova_interaction.qmd >}}
+
+# Vineland
+
+{{< include _vabs_ancova_interaction.qmd >}}
+
+# CGI
+
+{{< include _cgi_ancova_interaction.qmd >}}
+
+# Biomarkers
+
+{{< include _biomarkers_ancova_interaction.qmd >}}
+
+# Toolbox
+
+{{< include _toolbox_ancova_interaction.qmd >}}
+
+# Eye Tracking
+
+{{< include _eyetracking_ancova_zscore_interaction.qmd >}}
+
+
+```{r}
+#| label: export-tables
+#| echo: false
+#| include: false
+
+strata <- "molecular_interaction"
+
+# Create workbook
+wb <- openxlsx2::wb_workbook()
+
+# Add ELS as primary table
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Primary - ELS")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Primary - ELS", ft = els_ancova_intrxn_ft)
+
+# Add individual instrument tables
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "BMI")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "BMI", ft = bmi_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "ABC")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "ABC", ft = abc_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "ADAMS")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "ADAMS", ft = adams_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Peds QL")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Peds QL", ft = pql_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "CSHQ")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "CSHQ", ft = cshq_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "SNAP-IV")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "SNAP-IV", ft = snap_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "VAS")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "VAS", ft = vas_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "CGI")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "CGI", ft = cgi_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Vineland")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Vineland", ft = vabs_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Biomarkers")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Biomarkers", ft = biomarker_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Toolbox")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Toolbox", ft = tlbx_ancova_intrxn_ft)
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Eye Tracking")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Eye Tracking", ft = eye_ancova_z_intrxn_ft)
+
+# Combine all other instruments into secondary outcomes table
+secondary_tbl <- dplyr::bind_rows(
+  BMI = bmi_ancova_intrxn_summary,
+  ABC = abc_ancova_intrxn_summary,
+  ADAMS = adams_ancova_intrxn_summary,
+  PedsQL = pql_ancova_intrxn_summary,
+  CSHQ = cshq_ancova_intrxn_summary,
+  `SNAP-IV` = snap_ancova_intrxn_summary,
+  VAS = vas_ancova_intrxn_summary,
+  Vineland = vabs_ancova_intrxn_summary,
+  Biomarkers = biomarker_ancova_intrxn_summary,
+  Toolbox = tlbx_ancova_intrxn_summary,
+  `Eye Tracking` = eye_ancova_z_intrxn_summary,
+  .id = "Instrument"
+)
+
+# Format secondary outcomes table
+secondary_ft <- secondary_tbl |>
+  dplyr::select(-interaction_p) |>
+  flextable::as_grouped_data(groups = "Instrument") |>
+  dplyr::mutate(
+    Outcome = ifelse(
+      is.na(Outcome),
+      Instrument,
+      Outcome
+    )
+  ) |>
+  dplyr::select(-Instrument) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    strata_label = strata_label,
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI",
+    interaction_est = "Interaction Estimate",
+    interaction_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "", "Placebo", "Metformin", "Between-Group Differences", ""),
+    colwidths = c(1, 1, 7, 7, 4, 2)
+  ) |>
+  flextable::merge_v(j = c("Outcome", "interaction_est", "interaction_ci")) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1:2, align = "left", part = "all") |>
+  flextable::align(j = c(21, 22), align = "center", part = "body") |>
+  flextable::vline(j = c(2, 9, 16), part = "all") |>
+  flextable::autofit()
+
+wb <- openxlsx2::wb_add_worksheet(wb, sheet = "Secondary Outcomes")
+wb <- flexlsx::wb_add_flextable(wb, sheet = "Secondary Outcomes", ft = secondary_ft)
+
+# Save model result tables (not flextables) for each instrument
+ancova_model_results_tables <- list(
+  ELS = els_ancova_intrxn_summary,
+  BMI = bmi_ancova_intrxn_summary,
+  ABC = abc_ancova_intrxn_summary,
+  ADAMS = adams_ancova_intrxn_summary,
+  PedsQL = pql_ancova_intrxn_summary,
+  CSHQ = cshq_ancova_intrxn_summary,
+  `SNAP-IV` = snap_ancova_intrxn_summary,
+  VAS = vas_ancova_intrxn_summary,
+  CGI = cgi_ancova_intrxn_summary,
+  Vineland = vabs_ancova_intrxn_summary,
+  Biomarkers = biomarker_ancova_intrxn_summary,
+  Toolbox = tlbx_ancova_intrxn_summary,
+  `Eye Tracking` = eye_ancova_z_intrxn_summary
+)
+
+saveRDS(
+  object = ancova_model_results_tables,
+  file = glue::glue("metformin_{strata}_ancova_model_results_tables.rds")
+)
+
+# Save workbook
+openxlsx2::wb_save(
+  wb = wb,
+  file = glue::glue("{Sys.Date()}_metformin_{strata}_ancova_tables.xlsx"),
+  overwrite = TRUE
+)
+```
