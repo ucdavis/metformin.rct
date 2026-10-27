@@ -1,0 +1,137 @@
+
+```{r}
+#| label: generate-analytic-data
+
+met_data <- met_combined |>
+  dplyr::group_by(fxs_sts_id) |>
+  # fill in measurements only collected at baseline
+  tidyr::fill(demo_age, .direction = "down") |>
+  tidyr::fill(leit3_nv_iq, .direction = "down") |>
+  dplyr::ungroup() |>
+  dplyr::mutate(
+    Treatment = factor(Treatment, levels = c("Placebo", "Metformin"))
+  ) |> 
+  # calculate pql overall
+  calculate_pql_overall()
+
+met_baseline <- met_data |>
+  dplyr::filter(redcap_event_name == "Baseline Visit (Visit 1)")
+
+n_screened <- nrow(met_baseline)
+n_screened_ucd <- met_baseline |> dplyr::filter(Site == "UCD") |> nrow()
+n_screened_edm <- met_baseline |> dplyr::filter(Site == "Edmonton") |> nrow()
+n_screened_stj <- met_baseline |> dplyr::filter(Site == "STJ") |> nrow()
+
+
+met_baseline_screen <- met_baseline |>
+  dplyr::filter(rand_inclyn == "Yes" | rand_code %in% c("1-035", "1-040"))
+met_baseline_iq <- met_baseline_screen |>
+  dplyr::filter(leit3_nv_iq < 85)
+met_baseline_ltfu <- met_baseline_iq |>
+  dplyr::filter(!is.na(Treatment))
+
+n_rand <- nrow(met_baseline_ltfu)
+
+n_met <- sum(met_baseline_ltfu$Treatment == "Metformin")
+n_placebo <- sum(met_baseline_ltfu$Treatment == "Placebo")
+
+# keep those with > 1 visits
+met_multi_visit <- met_data |>
+  dplyr::mutate(
+    n_visit = dplyr::n(),
+    .by = fxs_sts_id
+  ) |>
+  dplyr::filter(fxs_sts_id %in% met_baseline_ltfu$fxs_sts_id, n_visit > 1)
+
+met_2visit <- met_multi_visit |>
+  dplyr::filter(n_visit == 2) |>
+  t()
+# Manual review: 
+#   FXSMET-18-2-003 and FXSMET-18-2-039 only have data for Visit 1 -> DROP
+#   107413-100 has partial data for Visit 2 -> KEEP
+
+met_analytic <- met_multi_visit |>
+  dplyr::mutate(
+    cgis_soi_fct = dplyr::case_when(
+      (cgis_soi == "1 = Normal" | 
+         cgis_soi == "2 = Borderline Ill") ~ "< 3 = Normal, Borderline Ill",
+      .default = cgis_soi
+    ) |>
+      factor(
+        levels = c(
+          "< 3 = Normal, Borderline Ill",
+          "3 = Mildly Ill", "4 = Moderately Ill", "5 = Markedly Ill",
+          "6 = Severely Ill", "7 = Among the Most Extremely Ill Patients"
+        )
+      ),
+    cgis_soi = stringr::str_extract(cgis_soi, "[:digit:]") |> as.numeric()
+  ) |>
+  dplyr::filter(
+    !(fxs_sts_id %in% c("FXSMET-18-2-003", "FXSMET-18-2-039"))
+  )
+
+## final data prep: create post-baseline time variables for model fitting
+met_analytic <- met_analytic |>
+  dplyr::mutate(
+    age_group = dplyr::case_when(
+      demo_age < 12 ~ "Age 6-11",
+      demo_age >= 12 ~ "Age 12+"
+    ) |>
+      factor(levels = c("Age 6-11", "Age 12+")),
+    t2 = dplyr::if_else(redcap_event_name == "Week 8 Visit (Visit 2)", 1, 0),
+    t3 = dplyr::if_else(redcap_event_name == "Week 16 (Visit 3/Early Term)", 1, 0),
+    t23 = dplyr::if_else(redcap_event_name == "Baseline Visit (Visit 1)", 0 , 1),
+    time = dplyr::case_when(
+      redcap_event_name == "Baseline Visit (Visit 1)" ~ 0,
+      redcap_event_name == "Week 8 Visit (Visit 2)" ~ 8,
+      redcap_event_name == "Week 16 (Visit 3/Early Term)" ~ 16
+    ),
+    Metformin = as.numeric(Treatment == "Metformin"),
+    Placebo = as.numeric(Treatment == "Placebo"),
+    dplyr::across(
+      .cols = c(demo_age, leit3_nv_iq),
+      ~ .x - mean(.x, na.rm = TRUE),
+      .names = "{col}_center"
+    )
+  ) |>
+  dplyr::mutate(
+    lang = dplyr::if_else(
+      lang == "", NA_character_, lang
+    ),
+    Language = dplyr::if_else(
+      els_french == 0, "English", "French"
+    )
+  ) |>
+  dplyr::group_by(fxs_sts_id) |>
+  tidyr::fill(lang, .direction = "down") |>
+  dplyr::ungroup() |> 
+  # reclassify full mutation females as mosaic
+  dplyr::mutate(
+    Molecular.Category = dplyr::if_else(
+      condition = Molecular.Category == "Full" & sex == "Female",
+      true = "Mosaic",
+      false = Molecular.Category
+    )
+  )
+
+met_analytic_baseline <- met_analytic |>
+  dplyr::filter(redcap_event_name == "Baseline Visit (Visit 1)")
+
+n_final <- nrow(met_analytic_baseline)
+n_final_ucd <- met_analytic_baseline |> dplyr::filter(Site == "UCD") |> nrow()
+n_final_edm <- met_analytic_baseline |> dplyr::filter(Site == "Edmonton") |> nrow()
+n_final_stj <- met_analytic_baseline |> dplyr::filter(Site == "STJ") |> nrow()
+
+met_analytic_eng <- dplyr::filter(met_analytic, Language == "English")
+
+met_stj <- dplyr::filter(met_analytic, Site == "STJ")
+
+met_cols <- colnames(met_analytic)
+
+met_analytic_ids <- met_analytic |> 
+  dplyr::pull(fxs_sts_id) |> 
+  unique()
+
+# usethis::use_data(met_analytic_ids, overwrite = TRUE)
+# usethis::use_data(met_analytic, overwrite = TRUE)
+```

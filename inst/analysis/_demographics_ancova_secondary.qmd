@@ -1,0 +1,105 @@
+```{r}
+#| label: demographics-ancova-secondary
+#| include: false
+
+# Generate age-stratified demographic tables limited to ANCOVA complete cases for secondary outcomes
+demographic_variables <- c(
+  "demo_age", "sex", "Race", "Ethnicity", "weight_kg",
+  "leit3_nv_iq", "cgis_soi_fct", "Molecular.Category"
+)
+
+demographic_labels <- list(
+  "demo_age" = "Age (years)",
+  "sex" = "Sex",
+  "Race" = "Race",
+  "Ethnicity" = "Ethnicity",
+  "weight_kg" = "Weight (kg)",
+  "leit3_nv_iq" = "IQ",
+  "cgis_soi_fct" = "CGIS Severity of Illness",
+  "Molecular.Category" = "Molecular Category"
+)
+
+secondary_var <- c(
+  # bmi
+  "bmi",
+  # abc
+  "abc_comp_rev", "ss_i_irrit_rev", "ss_ii_leth_rev", "ss_iii_stereo_rev",
+  "ss_iv_hyper_rev", "ss_v_inapp_rev", "ss_vi_socavoid_rev",
+  # adams
+  "adams_manic", "adams_depress", "adams_avoid", "adams_anxious", "adams_obsess",
+  # pedsql
+  "pql_pf_tot", "pql_ef_tot", "pql_socf_tot", "pql_schf_tot",
+  # cshq
+  "cshq_ts",
+  # snap
+  "snap_adhd_combtot", "snap_odd_tot",
+  # vas
+  "vas_tb1_beh", "vas_tb2_lang", "vas_tb3_eat",
+  # vabs
+  "vabs3_rc_ss", "vabs3_ec_rs", "vabs3_wc_rs", "vabs3_pd_rs", "vabs3_dd_rs", 
+  "vabs3_cd_rs", "vabs3_is_rs", "vabs3_ps_rs", "vabs3_cs_rs",
+  "vabs3_ac_ss", "vabs3_c_ss", "vabs3_dl_ss", "vabs3_s_ss"
+)
+
+demog_tbls_ancova_secondary <- summarize_demographics_ancova(
+  dataset = data,
+  outcome_vars = secondary_var,
+  demo_vars = demographic_variables,
+  demo_labels = demographic_labels,
+  age_stratify = TRUE,
+  demo_age_var = "demo_age"
+)
+
+demog_secondary_merged_ft <- demog_tbls_ancova_secondary$merged |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+```
+
+### Table 2a: All Subjects
+
+Baseline characteristics of all subjects with complete ANCOVA data for secondary outcomes.
+
+```{r}
+#| label: tbl-demographic-ancova-secondary-all
+#| tbl-cap: "Characteristics of the study cohort by treatment (subjects with complete ANCOVA data for Secondary outcomes)."
+
+demog_secondary_all_ft <- demog_tbls_ancova_secondary$all |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+
+demog_secondary_all_ft
+```
+
+\
+
+### Table 2b: Age 6-11
+
+Baseline characteristics of subjects aged 6-11 years with complete ANCOVA data for secondary outcomes. P-values compare Metformin vs. Placebo within the 6-11 age group.
+
+```{r}
+#| label: tbl-demographic-ancova-secondary-age-6-11
+#| tbl-cap: "Characteristics of subjects aged 6-11 by treatment (subjects with complete ANCOVA data for secondary outcomes)."
+
+demog_secondary_age6_ft <- demog_tbls_ancova_secondary$age_6_11 |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+
+demog_secondary_age6_ft
+```
+
+\
+
+### Table 2c: Age 12+
+
+Baseline characteristics of subjects aged 12+ years with complete ANCOVA data for secondary outcomes. P-values compare Metformin vs. Placebo within the 12+ age group.
+
+```{r}
+#| label: tbl-demographic-ancova-secondary-age-12-up
+#| tbl-cap: "Characteristics of subjects aged 12+ by treatment (subjects with complete ANCOVA data for secondary outcomes)."
+
+demog_secondary_age12_ft <- demog_tbls_ancova_secondary$age_12_up |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+
+demog_secondary_age12_ft
+```

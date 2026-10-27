@@ -1,0 +1,104 @@
+```{r}
+#| label: cgi-ancova
+#| include: false
+
+# Prepare CGI data for ANCOVA
+# CGI is different from other outcomes:
+# - cgis_soi (baseline) is the severity at Visit 1
+# - cgi_i (Week 16) is the improvement at Visit 3
+# We rename cgis to cgi at Visit 1 so fit_cgi_ancova treats it as baseline
+data_cgi <- data |>
+  dplyr::mutate(
+    cgis = cgis_soi |> as.numeric(),
+    cgi = cgi_i |> as.numeric()
+  ) |>
+  dplyr::mutate(
+    # At baseline (Visit 1), replace cgi with cgis
+    cgi = dplyr::if_else(
+      redcap_event_name == "Baseline Visit (Visit 1)",
+      cgis,
+      cgi
+    )
+  )
+
+cgi_var <- c("cgi")
+cgi_label <- c("CGI-Improvement")
+
+names(cgi_label) = cgi_var
+
+# fit ANCOVA models using CGI-specific function
+cgi_ancova <- lapply(
+  cgi_var,
+  function(x) fit_cgi_ancova(
+    dataset = data_cgi,
+    outcome = x,
+    outcome_label = cgi_label[x]
+  )
+)
+names(cgi_ancova) <- cgi_label
+
+# extract tables from fit_cgi_ancova output
+cgi_ancova_summary <- dplyr::bind_rows(
+  lapply(
+    names(cgi_ancova),
+    function(x) {
+      cgi_ancova[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-cgi-ancova
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "CGI - ANCOVA results showing LS means (95% CI) for baseline CGI-SOI (Severity of Illness)
+#|    and full ANCOVA model CGI-I (Improvement), with between-group differences. {data_caption}")
+
+cgi_ancova_ft <- cgi_ancova_summary |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    full_p = "Full Model",
+    full_p_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    full_m = "Full Model",
+    full_m_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    full_contrast_mean = "Full Model Diff",
+    full_contrast_ci = "95% CI",
+    full_contrast_p = "p-value"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 5, 5, 5)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 6, 11), part = "all") |>
+  flextable::autofit()
+
+cgi_ancova_ft
+```
+
+```{r}
+#| label: fig-cgi-ancova-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "CGI - Forest plot showing between-group differences in changes. {data_caption}")
+
+plot_ancova_forest(
+  obj = cgi_ancova,
+  labels = cgi_label,
+  min_mult = 1.1,
+  max_mult = 1.1
+)
+```

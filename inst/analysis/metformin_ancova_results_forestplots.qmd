@@ -1,0 +1,557 @@
+---
+title: "FXS Metformin Clinical Trial - ANCOVA Results Summary"
+format:
+  docx:
+    echo: false
+  html:
+    embed-resources: true
+    lightbox: true
+    toc: true
+    toc-depth: 3
+    echo: false
+---
+
+```{r}
+#| include: false
+#| label: setup
+
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  include = TRUE,
+  warning = FALSE
+)
+
+ggplot2::theme_set(ggplot2::theme_classic())
+```
+
+```{r}
+#| label: libraries
+#| message: false
+
+devtools::load_all()
+library(dplyr)
+library(tidyr)
+library(flextable)
+library(glue)
+library(openxlsx2)
+library(flexlsx)
+
+flextable::set_flextable_defaults(
+  theme_fun = flextable::theme_vanilla
+)
+```
+
+# Introduction
+
+This report imports the adjusted ANCOVA results from three analyses:
+
+1. **All ANCOVA** (`metformin_all_data_ancova_model_results_tables.rds`) — Treatment effect adjusted for baseline, Site, age, nonverbal IQ, and sex.
+2. **Age Group Interaction ANCOVA** (`metformin_all_data_age_interaction_ancova_model_results_tables.rds`) — Treatment effect stratified by Age 6-11 vs. Age 12+.
+3. **Molecular Category Interaction ANCOVA** (`metformin_molecular_interaction_ancova_model_results_tables.rds`) — Treatment effect stratified by Full vs. Mosaic methylation.
+
+```{r}
+#| label: load-results
+#| include: false
+
+ancova_results <- readRDS(
+  "metformin_all_data_ancova_model_results_tables.rds"
+)
+age_results    <- readRDS(
+  "metformin_all_data_age_interaction_ancova_model_results_tables.rds"
+)
+mol_results    <- readRDS(
+  "metformin_molecular_interaction_ancova_model_results_tables.rds"
+)
+
+# Instruments to include in combined summary (CGI excluded per reporting convention)
+instruments <- c(
+  "ELS", "BMI", "ABC", "ADAMS", "PedsQL", "CSHQ",
+  "SNAP-IV", "VAS", "Vineland", "Biomarkers", "Toolbox", "Eye Tracking"
+)
+```
+
+```{r}
+#| label: build-summary-table
+#| include: false
+
+# --- Pooled results ---
+pooled_tbl <- dplyr::bind_rows(
+  lapply(instruments, function(inst) {
+    ancova_results[[inst]] |>
+      dplyr::select(Outcome, n_p, n_m, contrast_mean, contrast_ci, contrast_p) |>
+      dplyr::mutate(Instrument = inst, .before = 1) |> 
+      dplyr::filter(
+        !(
+          Instrument == "Vineland" & stringr::str_detect(Outcome, "Scale Score")
+          )
+      )
+  })
+) |> 
+  dplyr::mutate(
+    Outcome = ifelse(
+      Outcome == "Written  Raw Score",
+      "Written Raw Score",
+      Outcome
+    )
+  )
+
+# --- Age interaction results: pivot to one row per outcome ---
+age_tbl <- dplyr::bind_rows(
+  lapply(instruments, function(inst) {
+    age_results[[inst]] |>
+      dplyr::select(
+        Outcome, strata_label,
+        contrast_mean, contrast_ci, interaction_p
+      ) |>
+      dplyr::mutate(Instrument = inst, .before = 1)
+  })
+) |>
+  tidyr::pivot_wider(
+    id_cols = c(Instrument, Outcome, interaction_p),
+    names_from = strata_label,
+    values_from = c(contrast_mean, contrast_ci),
+    names_glue = "{strata_label}_{.value}"
+  ) |>
+  dplyr::rename(
+    age_interaction_p    = interaction_p,
+    contrast_mean_age611 = `Age 6-11_contrast_mean`,
+    contrast_ci_age611   = `Age 6-11_contrast_ci`,
+    contrast_mean_age12  = `Age 12+_contrast_mean`,
+    contrast_ci_age12    = `Age 12+_contrast_ci`
+  )
+
+# --- Molecular interaction results: pivot to one row per outcome ---
+mol_tbl <- dplyr::bind_rows(
+  lapply(instruments, function(inst) {
+    mol_results[[inst]] |>
+      dplyr::select(
+        Outcome, strata_label,
+        contrast_mean, contrast_ci, interaction_p
+      ) |>
+      dplyr::mutate(Instrument = inst, .before = 1)
+  })
+) |>
+  tidyr::pivot_wider(
+    id_cols = c(Instrument, Outcome, interaction_p),
+    names_from = strata_label,
+    values_from = c(contrast_mean, contrast_ci),
+    names_glue = "{strata_label}_{.value}"
+  ) |>
+  dplyr::rename(
+    mol_interaction_p    = interaction_p,
+    contrast_mean_full   = Full_contrast_mean,
+    contrast_ci_full     = Full_contrast_ci,
+    contrast_mean_mosaic = Mosaic_contrast_mean,
+    contrast_ci_mosaic   = Mosaic_contrast_ci
+  )
+
+# --- Join all three and reorder columns ---
+summary_tbl <- pooled_tbl |>
+  dplyr::left_join(age_tbl, by = c("Instrument", "Outcome")) |>
+  dplyr::left_join(mol_tbl, by = c("Instrument", "Outcome")) |>
+  dplyr::select(
+    Instrument, Outcome,
+    n_p, n_m,
+    contrast_mean, contrast_ci, contrast_p,
+    contrast_mean_age611, contrast_ci_age611,
+    contrast_mean_age12, contrast_ci_age12,
+    age_interaction_p,
+    contrast_mean_full, contrast_ci_full,
+    contrast_mean_mosaic, contrast_ci_mosaic,
+    mol_interaction_p
+  )
+```
+
+```{r}
+#| label: forest-data-prep
+#| include: false
+
+flipped_labs <- c("Metformin", "Placebo")
+# pivot summary table to long format for forest plot
+forest_data <- summary_tbl |>
+  dplyr::select(
+    Instrument, Outcome,
+    contrast_mean, contrast_ci,
+    contrast_mean_age611, contrast_ci_age611,
+    contrast_mean_age12, contrast_ci_age12
+    # contrast_mean_full, contrast_ci_full,
+    # contrast_mean_mosaic, contrast_ci_mosaic
+  ) |> 
+  dplyr::rename(
+    all_mean = contrast_mean,
+    all_ci   = contrast_ci,
+    age611_mean = contrast_mean_age611,
+    age611_ci   = contrast_ci_age611,
+    age12_mean = contrast_mean_age12,
+    age12_ci   = contrast_ci_age12
+    # full_mean  = contrast_mean_full,
+    # full_ci    = contrast_ci_full,
+    # mosaic_mean = contrast_mean_mosaic,
+    # mosaic_ci   = contrast_ci_mosaic
+  ) |> 
+  tidyr::pivot_longer(
+    cols = c(dplyr::ends_with("_mean"), 
+             dplyr::ends_with("_ci")),
+    names_to = c("Analysis", ".value"),
+    names_sep = "_"
+  ) |> 
+  dplyr::mutate(
+    Analysis = dplyr::case_when(
+      Analysis == "all"    ~ "All",
+      Analysis == "age611" ~ "Age 6-11",
+      Analysis == "age12"  ~ "Age 12+"
+      # Analysis == "full"   ~ "Full",
+      # Analysis == "mosaic" ~ "Mosaic",
+      TRUE ~ NA_character_
+    ),
+    Instrument = factor(Instrument, levels = instruments),
+    ci_split = gsub("[()]", "", ci)
+  ) |> 
+  tidyr::separate(
+    ci_split, into = c("low", "hi"), sep = ","
+  ) |> 
+  dplyr::mutate(
+    # convert estimates and conf ints to numeric
+    dplyr::across(
+      .cols = c(mean, low, hi),
+      .fns = ~ as.numeric(.x)
+    ),
+    # determine significance using conf int
+    sig = dplyr::case_when(
+      (low < 0 & hi < 0) | (low > 0 & hi > 0) ~ "Yes",
+      TRUE ~ "No"
+    ),
+    # remove NDW50 from outcome
+    Outcome = gsub(" NDW50", "", Outcome)
+  ) |> 
+  dplyr::mutate(
+    any.sig = ifelse(any(sig == "Yes"), "Yes", "No"),
+    .by = c(Instrument, Outcome)
+  ) |> 
+  dplyr::rename(
+    Estimate = mean
+  )
+
+forest_data_all <- forest_data |> 
+  dplyr::filter(Analysis == "All")
+forest_data_stratified <- forest_data |> 
+  dplyr::filter(Analysis != "All")
+
+## Main analysis ##
+forest_primary_all <- forest_data_all |>
+  dplyr::filter(Instrument == "ELS") |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |> 
+  plot_composite_forest(grouped = FALSE)
+
+forest_primary_stratified <- forest_data_stratified |>
+  dplyr::filter(Instrument == "ELS") |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |> 
+  plot_composite_forest()
+## Secondary analyses ##
+forest_abc <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("ABC"), any.sig == "Yes"
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest(arrow_labs = flipped_labs)
+
+forest_adams <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("ADAMS"), any.sig == "Yes"
+  ) |>
+  dplyr::mutate(
+    Outcome = gsub(" Total", "", Outcome)
+  ) |> 
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest(arrow_labs = flipped_labs)
+
+forest_pql <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("PedsQL"), any.sig == "Yes"
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest()
+
+forest_cshq <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("CSHQ"), any.sig == "Yes"
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest(arrow_labs = flipped_labs)
+
+forest_vas <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("VAS"), any.sig == "Yes"
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest()
+
+forest_vabs <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("Vineland"), any.sig == "Yes"
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest()
+
+forest_eyetracking <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("Eye Tracking")
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest()
+
+forest_toolbox <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("Toolbox"), any.sig == "Yes"
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest()
+
+forest_bmi <- forest_data |> 
+  dplyr::filter(
+    Instrument %in% c("BMI"), any.sig == "Yes"
+  ) |>
+  dplyr::select(Instrument, Outcome, Analysis, Estimate, low, hi) |>
+  plot_composite_forest(arrow_labs = flipped_labs)
+```
+
+{{< pagebreak >}}
+
+# Forest Plots
+
+```{r}
+#| label: fig-els-summary-forest
+#| fig-height: 6
+#| fig-width: 8
+#| fig-cap: "ELS (Primary Outcome) — Forest plot of between-group treatment differences in 16-week change across all patients, age-stratified (Age 6-11, Age 12+), and molecular-category-stratified (Full Methylation, Mosaic Methylation) analyses."
+
+forest_primary_all
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-els-stratified-summary-forest
+#| fig-height: 6
+#| fig-width: 8
+#| fig-cap: "ELS (Primary Outcome) — Forest plot of between-group treatment differences in 16-week change across all patients, age-stratified (Age 6-11, Age 12+), and molecular-category-stratified (Full Methylation, Mosaic Methylation) analyses."
+
+forest_primary_stratified
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-els-forest
+#| fig-height: 6
+#| fig-width: 8
+#| fig-cap: "Forest plots of ELS primary outcomes. Forest plots show estimated 16-week treatment effect differences between Metformin and placebo groups across (A) all randomized participants and (B) age-stratified (Age 6-11, Age 12+) and molecular-category-stratified (Full Methylation, Mosaic Methylation) subgroups. Data are presented for the LS mean difference and its 95% CI between Metformin and placebo on change from baseline and week 16."
+
+forest_primary <- cowplot::plot_grid(
+  forest_primary_all,
+  forest_primary_stratified,
+  ncol = 1,
+  align = "hv",
+  labels = c("A)", "B)")
+)
+
+forest_primary
+```
+
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-bmi-summary-forest
+#| fig-height: 4
+#| fig-width: 8
+#| fig-cap: "BMI — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_bmi
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-abc-summary-forest
+#| fig-height: 8
+#| fig-width: 8
+#| fig-cap: "ABC — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_abc
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-adams-summary-forest
+#| fig-height: 6
+#| fig-width: 8
+#| fig-cap: "ADAMS — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_adams
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-pql-summary-forest
+#| fig-height: 6
+#| fig-width: 8
+#| fig-cap: "PedsQL — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_pql
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-cshq-summary-forest
+#| fig-height: 6
+#| fig-width: 8
+#| fig-cap: "CSHQ — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_cshq
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-vas-summary-forest
+#| fig-height: 4
+#| fig-width: 8
+#| fig-cap: "VAS — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_vas
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-vineland-summary-forest
+#| fig-height: 10
+#| fig-width: 8
+#| fig-cap: "Vineland — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_vabs
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-toolbox-summary-forest
+#| fig-height: 6
+#| fig-width: 8
+#| fig-cap: "NIH Toolbox — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_toolbox
+```
+
+{{< pagebreak >}}
+
+```{r}
+#| label: fig-eyetracking-summary-forest
+#| fig-height: 8
+#| fig-width: 8
+#| fig-cap: "Eye Tracking — Forest plot of between-group treatment differences in 16-week change (significant outcomes only) across all patients, age-stratified, and molecular-category-stratified analyses."
+
+forest_eyetracking
+```
+
+```{r}
+#| label: export-figures
+#| include: false
+#| eval: false
+
+# export figures to TIFF at 600 dpi #
+# ELS
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_primary_{Sys.Date()}.tiff"),
+  plot = forest_primary,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 6
+)
+
+# BMI
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_bmi_{Sys.Date()}.tiff"),
+  plot = forest_bmi,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 4
+)
+
+# ABC
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_abc_{Sys.Date()}.tiff"),
+  plot = forest_abc,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 8
+)
+# ADAMS
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_adams_{Sys.Date()}.tiff"),
+  plot = forest_adams,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 6
+)
+
+# PQL
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_pedsql_{Sys.Date()}.tiff"),
+  plot = forest_pql,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 6
+)
+
+# CSHQ
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_cshq_{Sys.Date()}.tiff"),
+  plot = forest_cshq,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 4
+)
+
+# VAS
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_vas_{Sys.Date()}.tiff"),
+  plot = forest_vas,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 4
+)
+
+# Vineland
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_vineland_{Sys.Date()}.tiff"),
+  plot = forest_vabs,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 10
+)
+
+# Toolbox
+ggplot2::ggsave(
+  filename = glue::glue("./analyses/figures/forest_toolbox_{Sys.Date()}.tiff"),
+  plot = forest_toolbox,
+  device = "tiff",
+  dpi = 600,
+  width = 8,
+  height = 6
+)
+```
+

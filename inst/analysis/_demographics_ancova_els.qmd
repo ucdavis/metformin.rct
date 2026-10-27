@@ -1,0 +1,85 @@
+```{r}
+#| label: demographics-ancova-els
+#| include: false
+
+# Generate age-stratified demographic tables limited to ANCOVA complete cases for ELS outcomes
+demographic_variables <- c(
+  "demo_age", "sex", "Race", "Ethnicity", "weight_kg",
+  "leit3_nv_iq", "cgis_soi_fct", "Molecular.Category"
+)
+
+demographic_labels <- list(
+  "demo_age" = "Age (years)",
+  "sex" = "Sex",
+  "Race" = "Race",
+  "Ethnicity" = "Ethnicity",
+  "weight_kg" = "Weight (kg)",
+  "leit3_nv_iq" = "IQ",
+  "cgis_soi_fct" = "CGIS Severity of Illness",
+  "Molecular.Category" = "Molecular Category"
+)
+
+els_var <- c("nar_ndw50_a", "con_ndw50_a")
+
+demog_tbls_ancova_els <- summarize_demographics_ancova(
+  dataset = data,
+  outcome_vars = els_var,
+  demo_vars = demographic_variables,
+  demo_labels = demographic_labels,
+  age_stratify = TRUE,
+  demo_age_var = "demo_age"
+)
+
+demog_merged_ft <- demog_tbls_ancova_els$merged |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+```
+
+### Table 1a: All Subjects
+
+Baseline characteristics of all subjects with complete ANCOVA data for ELS outcomes.
+
+```{r}
+#| label: tbl-demographic-ancova-els-all
+#| tbl-cap: "Characteristics of the study cohort by treatment (subjects with complete ANCOVA data for ELS outcomes)."
+
+demog_all_ft <- demog_tbls_ancova_els$all |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+
+demog_all_ft
+```
+
+\
+
+### Table 1b: Age 6-11
+
+Baseline characteristics of subjects aged 6-11 years with complete ANCOVA data for ELS outcomes. P-values compare Metformin vs. Placebo within the 6-11 age group.
+
+```{r}
+#| label: tbl-demographic-ancova-els-age-6-11
+#| tbl-cap: "Characteristics of subjects aged 6-11 by treatment (subjects with complete ANCOVA data for ELS outcomes)."
+
+demog_age6_ft <- demog_tbls_ancova_els$age_6_11 |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+
+demog_age6_ft
+```
+
+\
+
+### Table 1c: Age 12+
+
+Baseline characteristics of subjects aged 12+ years with complete ANCOVA data for ELS outcomes. P-values compare Metformin vs. Placebo within the 12+ age group.
+
+```{r}
+#| label: tbl-demographic-ancova-els-age-12-up
+#| tbl-cap: "Characteristics of subjects aged 12+ by treatment (subjects with complete ANCOVA data for ELS outcomes)."
+
+demog_age12_ft <- demog_tbls_ancova_els$age_12_up |>
+  gtsummary::as_flex_table() |>
+  flextable::width(width = demog_tbl_width)
+
+demog_age12_ft
+```

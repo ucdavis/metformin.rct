@@ -1,0 +1,113 @@
+```{r}
+#| label: cgi-ancova-interaction
+#| include: false
+
+# Prepare CGI data for ANCOVA
+# CGI is different from other outcomes:
+# - cgis_soi (baseline) is the severity at Visit 1
+# - cgi_i (Week 16) is the improvement at Visit 3
+# We rename cgis to cgi at Visit 1 so fit_cgi_ancova_interaction treats it as baseline
+data_cgi <- data |>
+  dplyr::mutate(
+    cgis = cgis_soi |> as.numeric(),
+    cgi = cgi_i |> as.numeric()
+  ) |>
+  dplyr::mutate(
+    # At baseline (Visit 1), replace cgi with cgis
+    cgi = dplyr::if_else(
+      redcap_event_name == "Baseline Visit (Visit 1)",
+      cgis,
+      cgi
+    )
+  )
+
+cgi_var <- c("cgi")
+cgi_label <- c("CGI-Improvement")
+
+names(cgi_label) = cgi_var
+
+# fit ANCOVA models with Treatment*Age Group interaction using CGI-specific function
+cgi_ancova_intrxn <- lapply(
+  cgi_var,
+  function(x) fit_cgi_ancova_interaction(
+    dataset = data_cgi,
+    outcome = x,
+    outcome_label = cgi_label[x],
+    strata_var = strata_var,
+    strata_label = strata_label
+  )
+)
+names(cgi_ancova_intrxn) <- cgi_label
+
+# extract tables from fit_cgi_ancova_interaction output
+cgi_ancova_intrxn_summary <- dplyr::bind_rows(
+  lapply(
+    names(cgi_ancova_intrxn),
+    function(x) {
+      cgi_ancova_intrxn[[x]]$tbl
+    }
+  )
+)
+```
+
+```{r}
+#| label: tbl-cgi-ancova-interaction
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "CGI - ANCOVA results with Treatment*{strata_label} interaction showing LS means (95% CI)
+#|    for baseline CGI-SOI (Severity of Illness) and full ANCOVA model CGI-I (Improvement), with between-group
+#|    differences stratified by age group. {data_caption}")
+
+cgi_ancova_intrxn_ft <- cgi_ancova_intrxn_summary |>
+  dplyr::select(-interaction_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    strata_label = strata_label,
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    full_p = "Full Model",
+    full_p_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    full_m = "Full Model",
+    full_m_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    full_contrast_mean = "Full Model Diff",
+    full_contrast_ci = "95% CI",
+    interaction_est = "Interaction Estimate",
+    interaction_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "", "Placebo", "Metformin", "Between-Group Differences", ""),
+    colwidths = c(1, 1, 5, 5, 4, 2)
+  ) |>
+  flextable::merge_v(j = c("Outcome", "interaction_est", "interaction_ci")) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1:2, align = "left", part = "all") |>
+  flextable::align(j = c(17, 18), align = "center", part = "body") |>
+  flextable::vline(j = c(2, 7, 12), part = "all") |>
+  flextable::autofit()
+
+cgi_ancova_intrxn_ft
+```
+
+```{r}
+#| label: fig-cgi-ancova-interaction-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "CGI - Forest plot showing Treatment*{strata_label} interaction term. {data_caption}")
+
+plot_ancova_interaction_forest(
+  obj = cgi_ancova_intrxn,
+  labels = cgi_label,
+  min_mult = 1.1,
+  max_mult = 1.1,
+  arrow_labs = strata_levels
+)
+```

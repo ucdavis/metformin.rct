@@ -1,0 +1,95 @@
+```{r}
+#| label: bmi-ancova-unadjusted
+#| include: false
+
+bmi_var <- c("bmi")
+bmi_label <- c(
+  "Body Mass Index"
+)
+
+names(bmi_label) = bmi_var
+
+# fit ANCOVA models (unadjusted for demographics)
+bmi_ancova_unadj <- lapply(
+  bmi_var,
+  function(x) fit_ancova(
+    dataset = data,
+    outcome = x,
+    outcome_label = bmi_label[x],
+    demo_vars = NULL,
+    covariates = NULL
+  )
+)
+names(bmi_ancova_unadj) <- bmi_label
+
+# extract tables from fit_ancova output
+bmi_ancova_unadj_summary <- dplyr::bind_rows(
+  lapply(
+    names(bmi_ancova_unadj),
+    function(x) {
+      bmi_ancova_unadj[[x]]$tbl
+    }
+  )
+)
+
+# Note: Plots will be added in a future iteration
+```
+
+```{r}
+#| label: tbl-bmi-ancova-unadjusted
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "BMI - Unadjusted ANCOVA results showing LS means (95% CI) for baseline and 16-week change,
+#|    and between-group difference in changes (not adjusted for demographics). {data_caption}")
+
+bmi_ancova_unadj_ft <- bmi_ancova_unadj_summary |>
+  dplyr::select(-contrast_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 7, 7, 4)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 8, 15), part = "all") |>
+  flextable::autofit()
+
+bmi_ancova_unadj_ft
+```
+
+```{r}
+#| label: fig-bmi-ancova-unadjusted-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "BMI - Forest plot showing unadjusted between-group differences in changes. {data_caption}")
+
+plot_ancova_forest(
+  obj = bmi_ancova_unadj,
+  labels = bmi_label,
+  min_mult = 1.1,
+  max_mult = 1.1
+)
+```

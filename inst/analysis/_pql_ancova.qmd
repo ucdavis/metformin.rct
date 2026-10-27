@@ -1,0 +1,97 @@
+```{r}
+#| label: pql-ancova
+#| include: false
+
+pql_var <- c("pql_pf_tot", "pql_ef_tot", "pql_socf_tot", "pql_schf_tot")
+pql_label <- c(
+  "Physical Functioning", "Emotional Functioning",
+  "Social Functioning", "School Functioning"
+)
+
+names(pql_label) = pql_var
+
+# fit ANCOVA models
+pql_ancova <- lapply(
+  pql_var,
+  function(x) fit_ancova(
+    dataset = data,
+    outcome = x,
+    outcome_label = pql_label[x],
+    covariates = NULL
+  )
+)
+names(pql_ancova) <- pql_label
+
+# extract tables from fit_ancova output
+pql_ancova_summary <- dplyr::bind_rows(
+  lapply(
+    names(pql_ancova),
+    function(x) {
+      pql_ancova[[x]]$tbl
+    }
+  )
+)
+
+# Note: Plots will be added in a future iteration
+```
+
+```{r}
+#| label: tbl-pql-ancova
+#| tbl-cap: !expr
+#|    glue::glue(
+#|    "Peds QL - ANCOVA results showing LS means (95% CI) for baseline and 16-week change,
+#|    and between-group difference in changes. {data_caption}")
+
+pql_ancova_ft <- pql_ancova_summary |>
+  dplyr::select(-contrast_p) |>
+  flextable::flextable() |>
+  flextable::set_header_labels(
+    Outcome = "Outcome",
+    n_p = "N",
+    baseline_p = "Baseline",
+    baseline_p_ci = "95% CI",
+    week16_p = "Week 16",
+    week16_p_ci = "95% CI",
+    p_change = "Change",
+    p_change_ci = "95% CI",
+    n_m = "N",
+    baseline_m = "Baseline",
+    baseline_m_ci = "95% CI",
+    week16_m = "Week 16",
+    week16_m_ci = "95% CI",
+    m_change = "Change",
+    m_change_ci = "95% CI",
+    baseline_contrast_mean = "Baseline Diff",
+    baseline_contrast_ci = "95% CI",
+    contrast_mean = "Change Diff",
+    contrast_ci = "95% CI"
+  ) |>
+  flextable::add_header_row(
+    values = c("", "Placebo", "Metformin", "Between-Group Differences"),
+    colwidths = c(1, 7, 7, 4)
+  ) |>
+  flextable::theme_vanilla() |>
+  flextable::align(i = 1, align = "left", part = "header") |>
+  flextable::align(i = 2, align = "center", part = "header") |>
+  flextable::align(j = 1, align = "left", part = "all") |>
+  flextable::vline(j = c(1, 8, 15), part = "all") |>
+  flextable::autofit()
+
+pql_ancova_ft
+```
+
+```{r}
+#| label: fig-pql-ancova-forest
+#| fig-cap: !expr
+#|    glue::glue(
+#|    "Peds QL - Forest plot showing between-group differences in changes. {data_caption}")
+
+pql_ancova_list <- lapply(pql_ancova, function(x) list("fit" = x$fit$fit))
+
+plot_ancova_forest(
+  obj = pql_ancova_list,
+  labels = pql_label,
+  min_mult = 1.1,
+  max_mult = 1.1
+)
+```
