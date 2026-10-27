@@ -66,7 +66,7 @@ main_tbl_width = 0.61
 
 error_bar_caption = "Error bars indicate standard error."
 data_caption = c("Analysis conducted using English & French speaking participants.")
-
+flipped_labs <- c("Metformin", "Placebo")
 data_caption_els = c("Analysis conducted using English speaking participants.")
 ```
 

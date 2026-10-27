@@ -4,7 +4,7 @@
 
 # import data
 eye_raw <- read.csv(
-  file = "../data-ext/MET_AOI_FOR_ANALYSIS.csv"
+  file = "../extdata/MET_AOI_FOR_ANALYSIS.csv"
 )
 
 # restrict data to those with data at baseline and wk 16
